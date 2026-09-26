@@ -1039,6 +1039,33 @@
           <span class="stat-val" id="statFov">60.0°</span>
         </div>
       </div>
+
+      <div class="card" style="border-left: 3px solid var(--success); font-size: 0.85rem;">
+        <h2>Performance Benchmarks (vs Unity C#)</h2>
+        <div class="stat-row" style="margin-bottom: 0.35rem;">
+          <span class="stat-name">Full Rig Frame Step:</span>
+          <span class="stat-val" style="color:var(--success); font-weight:700;">135.18 ns (7.4M/s)</span>
+        </div>
+        <div class="stat-row" style="margin-bottom: 0.35rem;">
+          <span class="stat-name">Unity LateUpdate:</span>
+          <span class="stat-val" style="color:var(--muted);">~15-25 µs (110× faster)</span>
+        </div>
+        <div class="stat-row" style="margin-bottom: 0.35rem;">
+          <span class="stat-name">2nd-Order Spring:</span>
+          <span class="stat-val" style="color:var(--accent);">118.04 ns (8.5M/s)</span>
+        </div>
+        <div class="stat-row" style="margin-bottom: 0.35rem;">
+          <span class="stat-name">Sphere-Cast Occlusion:</span>
+          <span class="stat-val" style="color:var(--warning);">130.87 ns (20 cols)</span>
+        </div>
+        <div class="stat-row" style="margin-bottom: 0.5rem;">
+          <span class="stat-name">Sphere-AABB CCD:</span>
+          <span class="stat-val" style="color:var(--success);">9.83 ns (101M/s)</span>
+        </div>
+        <div style="border-top: 1px solid var(--panel-border); padding-top: 0.5rem; text-align: right;">
+          <a href="https://github.com/bhubbard/poormans-camera-rs/blob/main/BENCHMARKS.md" target="_blank" style="color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.75rem;">View Full Benchmarks Report &rarr;</a>
+        </div>
+      </div>
     </div>
   </main>
 
