@@ -1,0 +1,16 @@
+[package]
+name = "poormans-camera-rs"
+version = "0.1.0"
+edition = "2024"
+description = "Pure Rust 3D third-person camera rig with sphere-cast collision avoidance and spring damping from Evan Todd"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/bhubbard/poormans-camera-rs"
+keywords = ["camera", "game-development", "spring-damping", "sphere-cast", "third-person"]
+categories = ["game-development", "mathematics"]
+
+[dependencies]
+glam = { version = "0.29", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
+
+[dev-dependencies]

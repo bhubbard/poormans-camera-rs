@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>poormans-camera-rs | The Poor Man's 3D Camera Rig in Pure Rust</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --panel: #111827;
+      --panel-border: #1f2937;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+    header {
+      background: rgba(17, 24, 39, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 0.85rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .badge {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      font-weight: 600;
+    }
+    h1 { font-size: 1.2rem; font-weight: 700; color: #fff; }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      margin-left: 1.5rem;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: #fff; }
+    main {
+      flex: 1;
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.25rem 2rem;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 1.5rem;
+    }
+    @media (max-width: 1024px) {
+      main { grid-template-columns: 1fr; }
+    }
+    .viewport-card {
+      background: #000;
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 650px;
+    }
+    #viewport3d {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .pip-container {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      width: 220px;
+      height: 140px;
+      background: #000;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+      z-index: 20;
+    }
+    .pip-label {
+      position: absolute;
+      top: 4px;
+      left: 6px;
+      font-size: 0.65rem;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      z-index: 21;
+    }
+    #pipCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .viewport-overlay {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.8rem;
+      color: var(--muted);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .viewport-overlay strong { color: #fff; }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .card h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .control-group { margin-bottom: 0.85rem; }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 0.3rem;
+    }
+    .control-label span:last-child {
+      color: var(--accent);
+      font-family: monospace;
+      font-weight: 600;
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 5px;
+      border-radius: 3px;
+      background: #374151;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    .tab-btn-group {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .btn {
+      background: #1f2937;
+      color: #e5e7eb;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      padding: 0.45rem 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .btn:hover { background: #374151; color: #fff; }
+    .btn.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #1f2937;
+      font-size: 0.78rem;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-name { color: var(--muted); }
+    .stat-val { font-family: monospace; font-weight: 600; color: #fff; }
+    footer {
+      border-top: 1px solid var(--panel-border);
+      padding: 1rem 2rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>poormans-camera-rs</h1>
+      <span class="badge">Pure Rust 2024</span>
+    </div>
+    <div class="nav-links">
+      <a href="https://github.com/bhubbard/poormans-camera-rs" target="_blank">GitHub Repo</a>
+      <a href="https://docs.rs/poormans-camera-rs" target="_blank">Docs.rs</a>
+      <a href="https://github.com/evanw/poor-mans-camera" target="_blank">Evan Todd Spec</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="viewport-card">
+      <div class="viewport-overlay">
+        <strong>Controls:</strong> WASD to drive Target Cube &bull; Left Click & Drag to Orbit Camera &bull; Scroll to Zoom
+      </div>
+      <div id="viewport3d"></div>
+      <div class="pip-container">
+        <div class="pip-label">Player POV (Rendered)</div>
+        <canvas id="pipCanvas" width="220" height="140"></canvas>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="card">
+        <h2>2nd-Order Spring Dynamics</h2>
+        <div class="tab-btn-group">
+          <button class="btn active" id="btnPresetCrit">Critically Damped (ζ=1)</button>
+          <button class="btn" id="btnPresetUnder">Underdamped (Bouncy)</button>
+          <button class="btn" id="btnPresetCinema">Cinematic Loose</button>
+          <button class="btn" id="btnPresetStiff">Stiff / Tight</button>
+        </div>
+        <div class="control-group">
+          <div class="control-label"><span>Natural Frequency (ω)</span><span id="valOmega">10.0 rad/s</span></div>
+          <input type="range" id="sliderOmega" min="2" max="30" step="0.5" value="10">
+        </div>
+        <div class="control-group">
+          <div class="control-label"><span>Damping Ratio (ζ)</span><span id="valZeta">1.00</span></div>
+          <input type="range" id="sliderZeta" min="0.1" max="2.0" step="0.05" value="1.0">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Sphere-Cast Occlusion</h2>
+        <div class="control-group">
+          <div class="control-label"><span>Ideal Distance</span><span id="valDistance">5.0 m</span></div>
+          <input type="range" id="sliderDistance" min="2" max="10" step="0.2" value="5">
+        </div>
+        <div class="control-group">
+          <div class="control-label"><span>Near Clip Sphere Radius (R_near)</span><span id="valRadius">0.35 m</span></div>
+          <input type="range" id="sliderRadius" min="0.1" max="1.0" step="0.05" value="0.35">
+        </div>
+        <div class="control-group">
+          <div class="control-label"><span>Recovery Speed (Hysteresis)</span><span id="valHysteresis">4.0 m/s</span></div>
+          <input type="range" id="sliderHysteresis" min="0.5" max="10" step="0.5" value="4">
+        </div>
+        <div class="control-group">
+          <div class="control-label"><span>Shoulder Offset (X)</span><span id="valShoulder">0.5 m</span></div>
+          <input type="range" id="sliderShoulder" min="-1.0" max="1.0" step="0.1" value="0.5">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Camera Telemetry</h2>
+        <div class="stat-row">
+          <span class="stat-name">Occlusion State:</span>
+          <span class="stat-val" id="statOcclusion" style="color:var(--success);">CLEAR</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">Ideal Distance:</span>
+          <span class="stat-val" id="statIdealDist">5.00 m</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">Current Pulled Distance:</span>
+          <span class="stat-val" id="statCurrentDist">5.00 m</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">Spring Position Lag:</span>
+          <span class="stat-val" id="statLag">0.00 m</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">Speed-Dilation FOV:</span>
+          <span class="stat-val" id="statFov">60.0°</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>Pure Rust Edition 2024 &bull; Based on Evan Todd's "The Poor Man's 3D Camera" &bull; MIT / Apache 2.0</p>
+  </footer>
+
+  <script>
+    // --- 3D Scene Initialization ---
+    const container = document.getElementById('viewport3d');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x070b14);
+
+    // Main God-View Camera
+    const mainCamera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+    mainCamera.position.set(0, 10, 14);
+    mainCamera.lookAt(0, 0, 0);
+
+    // Player Third-Person Camera
+    const playerCamera = new THREE.PerspectiveCamera(60, 220 / 140, 0.1, 100);
+
+    // Main Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // PIP Renderer
+    const pipCanvas = document.getElementById('pipCanvas');
+    const pipRenderer = new THREE.WebGLRenderer({ canvas: pipCanvas, antialias: true });
+    pipRenderer.setSize(220, 140);
+    pipRenderer.shadowMap.enabled = true;
+
+    // Lighting
+    const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+    scene.add(ambient);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+    dirLight.position.set(10, 20, 10);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    // Grid Floor
+    const gridHelper = new THREE.GridHelper(40, 40, 0x1e293b, 0x0f172a);
+    gridHelper.position.y = -0.01;
+    scene.add(gridHelper);
+
+    // --- Environment Obstacles ---
+    const obstacles = [];
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+
+    function addBoxObstacle(x, y, z, w, h, d) {
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const mesh = new THREE.Mesh(geo, wallMaterial);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      obstacles.push({
+        type: 'box',
+        min: new THREE.Vector3(x - w / 2, y - h / 2, z - d / 2),
+        max: new THREE.Vector3(x + w / 2, y + h / 2, z + d / 2),
+        mesh
+      });
+    }
+
+    // Add walls and pillars
+    addBoxObstacle(0, 2, -4, 8, 4, 1);
+    addBoxObstacle(-5, 2.5, 2, 2, 5, 2);
+    addBoxObstacle(5, 2.5, 2, 2, 5, 2);
+    addBoxObstacle(0, 1.5, 6, 6, 3, 1);
+
+    // --- Target Character Cube ---
+    const targetGeo = new THREE.BoxGeometry(1, 1.6, 1);
+    const targetMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.3 });
+    const targetMesh = new THREE.Mesh(targetGeo, targetMat);
+    targetMesh.position.set(0, 0.8, 0);
+    targetMesh.castShadow = true;
+    scene.add(targetMesh);
+
+    // Target Velocity / Movement
+    let targetPos = new THREE.Vector3(0, 0.8, 0);
+    let targetVel = new THREE.Vector3();
+    const keys = {};
+    window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+    window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+    // --- Visualizer Gizmos ---
+    // Ideal Camera Ghost
+    const idealGeo = new THREE.SphereGeometry(0.3, 16, 16);
+    const idealMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8, wireframe: true, transparent: true, opacity: 0.4 });
+    const idealMesh = new THREE.Mesh(idealGeo, idealMat);
+    scene.add(idealMesh);
+
+    // Swept Ray Line
+    const rayGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const rayMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.6 });
+    const rayLine = new THREE.Line(rayGeo, rayMat);
+    scene.add(rayLine);
+
+    // Resolved / Pulled Camera Sphere
+    const resolvedGeo = new THREE.SphereGeometry(0.35, 16, 16);
+    const resolvedMat = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true });
+    const resolvedMesh = new THREE.Mesh(resolvedGeo, resolvedMat);
+    scene.add(resolvedMesh);
+
+    // Final Spring Damped Camera Rig Mesh (Frustum Pyramid)
+    const rigGeo = new THREE.ConeGeometry(0.4, 0.8, 4);
+    rigGeo.rotateX(Math.PI / 2);
+    const rigMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b });
+    const rigMesh = new THREE.Mesh(rigGeo, rigMat);
+    scene.add(rigMesh);
+
+    // --- Camera Parameters & Simulation State ---
+    let omega = 10.0;
+    let zeta = 1.0;
+    let idealDistance = 5.0;
+    let nearRadius = 0.35;
+    let recoverySpeed = 4.0;
+    let shoulderOffsetX = 0.5;
+
+    let orbitYaw = 0.0;
+    let orbitPitch = 0.3;
+
+    // Evan Todd's 2nd-Order Spring State
+    let springPos = new THREE.Vector3(0, 2, 5);
+    let springVel = new THREE.Vector3();
+    let currentHysteresisDist = idealDistance;
+
+    // Mouse Drag Orbit
+    let isDragging = false;
+    let prevMouseX = 0, prevMouseY = 0;
+    container.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+    });
+    window.addEventListener('mouseup', () => { isDragging = false; });
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - prevMouseX;
+      const dy = e.clientY - prevMouseY;
+      orbitYaw -= dx * 0.008;
+      orbitPitch = Math.max(-1.2, Math.min(1.3, orbitPitch + dy * 0.008));
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+    });
+
+    container.addEventListener('wheel', (e) => {
+      idealDistance = Math.max(2, Math.min(10, idealDistance + e.deltaY * 0.005));
+      document.getElementById('sliderDistance').value = idealDistance;
+      document.getElementById('valDistance').innerText = `${idealDistance.toFixed(1)} m`;
+    });
+
+    // 2nd-order analytical spring update
+    function updateScalarSpring(current, vel, target, w, z, dt) {
+      const x0 = current - target;
+      if (Math.abs(z - 1.0) < 1e-4) {
+        // Critical damping
+        const decay = Math.exp(-w * dt);
+        const c1 = x0;
+        const c2 = vel + w * x0;
+        const nPos = target + (c1 + c2 * dt) * decay;
+        const nVel = (c2 - w * (c1 + c2 * dt)) * decay;
+        return [nPos, nVel];
+      } else if (z < 1.0) {
+        // Underdamped
+        const wd = w * Math.sqrt(1 - z * z);
+        const decay = Math.exp(-z * w * dt);
+        const c1 = x0;
+        const c2 = (vel + z * w * x0) / wd;
+        const s = Math.sin(wd * dt), c = Math.cos(wd * dt);
+        const nPos = target + decay * (c1 * c + c2 * s);
+        const nVel = decay * ((c2 * wd - c1 * z * w) * c - (c1 * wd + c2 * z * w) * s);
+        return [nPos, nVel];
+      } else {
+        // Overdamped
+        const alpha = w * Math.sqrt(z * z - 1);
+        const r1 = -z * w + alpha, r2 = -z * w - alpha;
+        const c2 = (vel - r1 * x0) / (r2 - r1);
+        const c1 = x0 - c2;
+        const e1 = Math.exp(r1 * dt), e2 = Math.exp(r2 * dt);
+        return [target + c1 * e1 + c2 * e2, c1 * r1 * e1 + c2 * r2 * e2];
+      }
+    }
+
+    // Sphere cast against AABB box obstacles
+    function sweepSphereAABB(origin, dir, maxDist, radius, min, max) {
+      const expMin = min.clone().subScalar(radius);
+      const expMax = max.clone().addScalar(radius);
+
+      let tMin = (expMin.x - origin.x) / (dir.x !== 0 ? dir.x : 1e-6);
+      let tMax = (expMax.x - origin.x) / (dir.x !== 0 ? dir.x : 1e-6);
+      if (tMin > tMax) [tMin, tMax] = [tMax, tMin];
+
+      let tyMin = (expMin.y - origin.y) / (dir.y !== 0 ? dir.y : 1e-6);
+      let tyMax = (expMax.y - origin.y) / (dir.y !== 0 ? dir.y : 1e-6);
+      if (tyMin > tyMax) [tyMin, tyMax] = [tyMax, tyMin];
+
+      if (tMin > tyMax || tyMin > tMax) return null;
+      if (tyMin > tMin) tMin = tyMin;
+      if (tyMax < tMax) tMax = tyMax;
+
+      let tzMin = (expMin.z - origin.z) / (dir.z !== 0 ? dir.z : 1e-6);
+      let tzMax = (expMax.z - origin.z) / (dir.z !== 0 ? dir.z : 1e-6);
+      if (tzMin > tzMax) [tzMin, tzMax] = [tzMax, tzMin];
+
+      if (tMin > tzMax || tzMin > tMax) return null;
+      if (tzMin > tMin) tMin = tzMin;
+
+      if (tMin >= 0 && tMin <= maxDist) return tMin;
+      return null;
+    }
+
+    // --- Main Simulation Loop ---
+    let lastTime = performance.now();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      // 1. Move target cube with WASD
+      const moveSpeed = 6.0;
+      targetVel.set(0, 0, 0);
+      if (keys['w']) targetVel.z -= moveSpeed;
+      if (keys['s']) targetVel.z += moveSpeed;
+      if (keys['a']) targetVel.x -= moveSpeed;
+      if (keys['d']) targetVel.x += moveSpeed;
+
+      targetPos.addScaledVector(targetVel, dt);
+      targetPos.x = Math.max(-10, Math.min(10, targetPos.x));
+      targetPos.z = Math.max(-10, Math.min(10, targetPos.z));
+      targetMesh.position.copy(targetPos);
+
+      // 2. Compute camera forward vector and shoulder offset
+      const cosP = Math.cos(orbitPitch);
+      const forward = new THREE.Vector3(
+        -Math.sin(orbitYaw) * cosP,
+        Math.sin(orbitPitch),
+        -Math.cos(orbitYaw) * cosP
+      ).normalize();
+
+      const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+      const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+
+      const focalPoint = targetPos.clone().add(new THREE.Vector3(0, 0.5, 0));
+      const origin = focalPoint.clone().addScaledVector(right, shoulderOffsetX);
+
+      // Ideal camera position (unoccluded)
+      const idealPos = origin.clone().subScaledVector(forward, idealDistance);
+      idealMesh.position.copy(idealPos);
+
+      // 3. Sphere-Cast Occlusion Sweep
+      const sweepDir = idealPos.clone().sub(origin).normalize();
+      let nearestHitDist = idealDistance;
+      let occluded = false;
+
+      for (const obs of obstacles) {
+        const hitT = sweepSphereAABB(origin, sweepDir, idealDistance, nearRadius, obs.min, obs.max);
+        if (hitT !== null && hitT < nearestHitDist) {
+          nearestHitDist = hitT;
+          occluded = true;
+        }
+      }
+
+      // Hysteresis Filter (Fast pull-in, smooth push-out recovery)
+      const targetDist = Math.max(0.6, nearestHitDist);
+      if (targetDist < currentHysteresisDist) {
+        currentHysteresisDist = targetDist; // Instant pull in
+      } else {
+        currentHysteresisDist = Math.min(targetDist, currentHysteresisDist + recoverySpeed * dt);
+      }
+
+      const resolvedPos = origin.clone().addScaledVector(sweepDir, currentHysteresisDist);
+      resolvedMesh.position.copy(resolvedPos);
+      resolvedMesh.scale.setScalar(nearRadius / 0.35);
+
+      // 4. Update Ray Line Gizmo
+      const rayPoints = [origin, resolvedPos];
+      rayLine.geometry.setFromPoints(rayPoints);
+
+      // 5. 2nd-Order Spring Damping on Camera Rig
+      const [nx, vx] = updateScalarSpring(springPos.x, springVel.x, resolvedPos.x, omega, zeta, dt);
+      const [ny, vy] = updateScalarSpring(springPos.y, springVel.y, resolvedPos.y, omega, zeta, dt);
+      const [nz, vz] = updateScalarSpring(springPos.z, springVel.z, resolvedPos.z, omega, zeta, dt);
+
+      springPos.set(nx, ny, nz);
+      springVel.set(vx, vy, vz);
+      rigMesh.position.copy(springPos);
+      rigMesh.lookAt(focalPoint);
+
+      // 6. Dynamic Speed-Based FOV
+      const speed = targetVel.length();
+      const fovDilation = (speed / 8.0) * 15.0; // +15 deg at full sprint
+      const currentFov = 60.0 + fovDilation;
+      playerCamera.fov = currentFov;
+      playerCamera.updateProjectionMatrix();
+
+      // Update Player POV Camera
+      playerCamera.position.copy(springPos);
+      playerCamera.lookAt(focalPoint);
+
+      // 7. Update Telemetry
+      const statOcc = document.getElementById('statOcclusion');
+      if (occluded) {
+        statOcc.innerText = 'OCCLUDED (PULLED IN)';
+        statOcc.style.color = 'var(--danger)';
+      } else {
+        statOcc.innerText = 'CLEAR';
+        statOcc.style.color = 'var(--success)';
+      }
+
+      document.getElementById('statIdealDist').innerText = `${idealDistance.toFixed(2)} m`;
+      document.getElementById('statCurrentDist').innerText = `${currentHysteresisDist.toFixed(2)} m`;
+      document.getElementById('statLag').innerText = `${springPos.distanceTo(resolvedPos).toFixed(2)} m`;
+      document.getElementById('statFov').innerText = `${currentFov.toFixed(1)}°`;
+
+      // Render views
+      renderer.render(scene, mainCamera);
+      pipRenderer.render(scene, playerCamera);
+    }
+
+    // Window resize
+    window.addEventListener('resize', () => {
+      mainCamera.aspect = container.clientWidth / container.clientHeight;
+      mainCamera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    // UI Event Listeners
+    document.getElementById('sliderOmega').addEventListener('input', (e) => {
+      omega = parseFloat(e.target.value);
+      document.getElementById('valOmega').innerText = `${omega.toFixed(1)} rad/s`;
+    });
+
+    document.getElementById('sliderZeta').addEventListener('input', (e) => {
+      zeta = parseFloat(e.target.value);
+      document.getElementById('valZeta').innerText = `${zeta.toFixed(2)}`;
+    });
+
+    document.getElementById('sliderDistance').addEventListener('input', (e) => {
+      idealDistance = parseFloat(e.target.value);
+      document.getElementById('valDistance').innerText = `${idealDistance.toFixed(1)} m`;
+    });
+
+    document.getElementById('sliderRadius').addEventListener('input', (e) => {
+      nearRadius = parseFloat(e.target.value);
+      document.getElementById('valRadius').innerText = `${nearRadius.toFixed(2)} m`;
+    });
+
+    document.getElementById('sliderHysteresis').addEventListener('input', (e) => {
+      recoverySpeed = parseFloat(e.target.value);
+      document.getElementById('valHysteresis').innerText = `${recoverySpeed.toFixed(1)} m/s`;
+    });
+
+    document.getElementById('sliderShoulder').addEventListener('input', (e) => {
+      shoulderOffsetX = parseFloat(e.target.value);
+      document.getElementById('valShoulder').innerText = `${shoulderOffsetX.toFixed(1)} m`;
+    });
+
+    // Presets
+    document.getElementById('btnPresetCrit').addEventListener('click', () => {
+      omega = 12.0; zeta = 1.0;
+      updatePresetUI(12.0, 1.0);
+    });
+    document.getElementById('btnPresetUnder').addEventListener('click', () => {
+      omega = 10.0; zeta = 0.45;
+      updatePresetUI(10.0, 0.45);
+    });
+    document.getElementById('btnPresetCinema').addEventListener('click', () => {
+      omega = 5.5; zeta = 1.0;
+      updatePresetUI(5.5, 1.0);
+    });
+    document.getElementById('btnPresetStiff').addEventListener('click', () => {
+      omega = 25.0; zeta = 1.0;
+      updatePresetUI(25.0, 1.0);
+    });
+
+    function updatePresetUI(w, z) {
+      document.getElementById('sliderOmega').value = w;
+      document.getElementById('valOmega').innerText = `${w.toFixed(1)} rad/s`;
+      document.getElementById('sliderZeta').value = z;
+      document.getElementById('valZeta').innerText = `${z.toFixed(2)}`;
+    }
+
+    animate();
+  </script>
+</body>
+</html>
