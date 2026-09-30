@@ -1,6 +1,6 @@
 [package]
 name = "poormans-camera-rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Pure Rust 3D third-person camera rig with sphere-cast collision avoidance and spring damping from Evan Todd"
 license = "MIT OR Apache-2.0"
